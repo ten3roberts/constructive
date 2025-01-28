@@ -76,31 +76,23 @@ impl Plugin for ExamplePlugin {
         assets: &AssetCache,
         _: &mut ivy_engine::ivy_core::update_layer::ScheduleSetBuilder,
     ) -> anyhow::Result<()> {
-        let mut brush = Brush::plane();
-        brush.transform(Mat4::from_scale(Vec3::splat(10.0)));
+        let mut brush = Brush::cube();
+        brush.transform(Mat4::from_scale(vec3(10.0, 0.4, 10.0)));
 
         let clip_brushes = [
-            // Brush::cube().with_transform(Mat4::from_rotation_translation(
-            //     Quat::from_axis_angle(Vec3::Z, 1.0),
-            //     vec3(1.5, 0.0, 0.5),
-            // )),
-            // Brush::cube().with_transform(Mat4::from_rotation_translation(
-            //     Quat::IDENTITY,
-            //     vec3(0.5, 0.9, -0.5),
-            // )),
-            // Brush::cube().with_transform(Mat4::from_rotation_translation(
-            //     Quat::from_axis_angle(Vec3::Y, 2.0),
-            //     vec3(7.0, 0.5, 0.0),
-            // )),
             Brush::cube().with_transform(Mat4::from_rotation_translation(
-                Quat::IDENTITY,
+                Quat::from_axis_angle(vec3(0.0, 1.0, 1.0).normalize(), 1.0),
                 vec3(1.5, 0.0, 0.5),
             )),
             Brush::cube().with_transform(Mat4::from_rotation_translation(
                 Quat::IDENTITY,
-                vec3(0.5, 0.9, -2.5),
+                vec3(0.5, 0.9, -0.5),
             )),
             Brush::cube().with_transform(Mat4::from_rotation_translation(
+                Quat::from_axis_angle(Vec3::Y, 2.0),
+                vec3(3.0, 0.5, 4.0),
+            )),
+            Brush::uv_sphere().with_transform(Mat4::from_rotation_translation(
                 Quat::IDENTITY,
                 vec3(7.0, 0.5, 0.0),
             )),

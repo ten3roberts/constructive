@@ -9,6 +9,7 @@ use crate::{
     util::TOLERANCE,
 };
 
+#[derive(Debug)]
 pub struct Plane {
     pub normal: Vec3,
     pub distance: f32,
@@ -21,6 +22,8 @@ impl Plane {
 
     pub fn from_face(face: Face) -> Self {
         let normal = face.normal();
+        tracing::info!("{face:?}");
+        assert!(normal.is_finite());
         let distance = face.p1.dot(normal);
 
         Self { normal, distance }
@@ -42,6 +45,7 @@ impl Plane {
         } else if d1.abs() < TOLERANCE && d2.abs() < TOLERANCE && d3 <= -TOLERANCE {
             FaceIntersect::Coplanar
         } else {
+            tracing::info!(d1, d2, d3, ?face, ?self);
             FaceIntersect::Intersect
         }
     }
@@ -54,17 +58,24 @@ impl Plane {
     ) {
         let mut front_count = 0;
         let mut back_count = 0;
+        let mut coplanar_count = 0;
+
         let mut front = [Vec4::NAN; 3];
         let mut back = [Vec4::NAN; 3];
+        let mut coplanar = [Vec3::NAN; 3];
 
         for p in face.points() {
             let distance = self.distance_to_point(p);
-            if distance >= -TOLERANCE {
+            tracing::info!(distance);
+            if distance >= TOLERANCE {
                 front[front_count] = p.extend(distance);
                 front_count += 1;
-            } else {
+            } else if distance <= -TOLERANCE {
                 back[back_count] = p.extend(distance);
                 back_count += 1;
+            } else {
+                coplanar[coplanar_count] = p;
+                coplanar_count += 1;
             }
         }
 
@@ -77,7 +88,18 @@ impl Plane {
             }
         };
 
-        if front_count == 1 && back_count == 2 {
+        if coplanar_count == 1 {
+            assert_eq!(back_count, 1);
+            assert_eq!(front_count, 1);
+            let back = back[0];
+            let front = front[0];
+            let coplanar = coplanar[0];
+
+            let i1 = back.xyz().lerp(front.xyz(), back.w / (back.w - front.w));
+
+            front_result.push(orient(Face::new(coplanar, front.xyz(), i1)));
+            back_result.push(orient(Face::new(coplanar, i1, back.xyz())));
+        } else if front_count == 1 && back_count == 2 {
             // One point in front, two in back
             let f = front[0].xyz();
 
@@ -96,8 +118,12 @@ impl Plane {
             let front2 = front[1].xyz();
 
             // Two points in front, one in back
-            let i1 = b.lerp(front1, back[0].w / (back[0].w - front[0].w));
-            let i2 = b.lerp(front2, back[0].w / (back[0].w - front[1].w));
+            let t1 = back[0].w / (back[0].w - front[0].w);
+            let t2 = back[0].w / (back[0].w - front[1].w);
+
+            let i1 = b.lerp(front1, t1);
+            let i2 = b.lerp(front2, t2);
+
             back_result.push(orient(Face::new(b, i1, i2)));
             front_result.push(orient(Face::new(front1, front2, i1)));
             front_result.push(orient(Face::new(i1, front2, i2)));
@@ -117,7 +143,9 @@ impl Face {
         assert!(p1.is_finite());
         assert!(p2.is_finite());
         assert!(p3.is_finite());
-        Self { p1, p2, p3 }
+        let f = Self { p1, p2, p3 };
+        assert!(f.normal().is_finite());
+        f
     }
 
     pub fn normal(&self) -> Vec3 {
@@ -173,9 +201,15 @@ impl Brush {
 
     pub fn transform(&mut self, transform: Mat4) {
         for face in &mut self.faces {
-            face.p1 = transform.transform_point3(face.p1);
-            face.p2 = transform.transform_point3(face.p2);
-            face.p3 = transform.transform_point3(face.p3);
+            tracing::info!(?face, normal = ?face.normal(), "transform");
+            *face = Face::new(
+                transform.transform_point3(face.p1),
+                transform.transform_point3(face.p2),
+                transform.transform_point3(face.p3),
+            );
+            // face.p1 = transform.transform_point3(face.p1);
+            // face.p2 = transform.transform_point3(face.p2);
+            // face.p3 = transform.transform_point3(face.p3);
         }
     }
 
@@ -269,8 +303,8 @@ impl Brush {
 
     pub fn uv_sphere() -> Self {
         let radius = 1.0;
-        let slices = 8;
-        let stacks = 4;
+        let slices = 16;
+        let stacks = 12;
 
         let mut faces = Vec::new();
 
@@ -306,8 +340,11 @@ impl Brush {
                     radius * theta1.sin() * phi2.sin(),
                 );
 
-                faces.push(Face::new(p1, p2, p3));
-                faces.push(Face::new(p3, p4, p1));
+                if j != 0 {
+                    faces.push(Face::new(p1, p2, p3));
+                } else if j != stacks - 1 {
+                    faces.push(Face::new(p3, p4, p1));
+                }
             }
         }
 
