@@ -1,6 +1,7 @@
 pub mod brush;
 pub mod tree;
 mod util;
+pub mod edgelist;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
