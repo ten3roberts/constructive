@@ -14,7 +14,7 @@ impl BspTree {
     }
 
     /// Clips a brush to the tree
-    pub fn clip_brush(&self, brush: Brush) -> Brush {
+    pub fn clip_brush(&self, brush: &Brush) -> Brush {
         let faces = brush.faces();
 
         let mut result = Vec::new();

@@ -5,6 +5,7 @@ use itertools::Itertools;
 use slab::Slab;
 
 use crate::{
+    edgelist::VerticalPlane,
     tree::{BspTree, Node},
     util::TOLERANCE,
 };
@@ -22,7 +23,6 @@ impl Plane {
 
     pub fn from_face(face: Face) -> Self {
         let normal = face.normal();
-        tracing::info!("{face:?}");
         assert!(normal.is_finite());
         let distance = face.p1.dot(normal);
 
@@ -45,9 +45,25 @@ impl Plane {
         } else if d1.abs() < TOLERANCE && d2.abs() < TOLERANCE && d3 <= -TOLERANCE {
             FaceIntersect::Coplanar
         } else {
-            tracing::info!(d1, d2, d3, ?face, ?self);
             FaceIntersect::Intersect
         }
+    }
+
+    pub fn touching_or_front(&self, face: Face) -> bool {
+        let d1 = self.distance_to_point(face.p1);
+        let d2 = self.distance_to_point(face.p2);
+        let d3 = self.distance_to_point(face.p3);
+
+        d1 >= -TOLERANCE && d2 >= -TOLERANCE && d3 >= -TOLERANCE
+        // if d1 >= TOLERANCE && d2 >= TOLERANCE && d3 >= TOLERANCE {
+        //     FaceIntersect::Front
+        // } else if d1 <= -TOLERANCE && d2 <= -TOLERANCE && d3 <= -TOLERANCE {
+        //     FaceIntersect::Back
+        // } else if d1.abs() < TOLERANCE && d2.abs() < TOLERANCE && d3 <= -TOLERANCE {
+        //     FaceIntersect::Coplanar
+        // } else {
+        //     FaceIntersect::Intersect
+        // }
     }
 
     pub fn split_face(
@@ -66,7 +82,6 @@ impl Plane {
 
         for p in face.points() {
             let distance = self.distance_to_point(p);
-            tracing::info!(distance);
             if distance >= TOLERANCE {
                 front[front_count] = p.extend(distance);
                 front_count += 1;
@@ -155,6 +170,32 @@ impl Face {
     pub fn points(&self) -> [Vec3; 3] {
         [self.p1, self.p2, self.p3]
     }
+
+    pub fn edges(&self) -> [(Vec3, Vec3); 3] {
+        [(self.p1, self.p2), (self.p2, self.p3), (self.p3, self.p1)]
+    }
+
+    pub(crate) fn transform(&self, transform: Mat4) -> Face {
+        Self::new(
+            transform.transform_point3(self.p1),
+            transform.transform_point3(self.p2),
+            transform.transform_point3(self.p3),
+        )
+    }
+
+    pub fn contains_point(&self, point: Vec3) -> bool {
+        let normal = self.normal();
+
+        let ab = (point - self.p1).dot((self.p2 - self.p1).cross(normal));
+        let bc = (point - self.p2).dot((self.p3 - self.p2).cross(normal));
+        let ca = (point - self.p3).dot((self.p1 - self.p3).cross(normal));
+
+        ab < 0.0 && bc < 0.0 && ca < 0.0
+    }
+
+    pub(crate) fn map(&self, mut f: impl FnMut(Vec3) -> Vec3) -> Face {
+        Self::new(f(self.p1), f(self.p2), f(self.p3))
+    }
 }
 
 pub enum FaceIntersect {
@@ -164,7 +205,7 @@ pub enum FaceIntersect {
     Intersect,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Brush {
     faces: Vec<Face>,
 }
@@ -201,7 +242,6 @@ impl Brush {
 
     pub fn transform(&mut self, transform: Mat4) {
         for face in &mut self.faces {
-            tracing::info!(?face, normal = ?face.normal(), "transform");
             *face = Face::new(
                 transform.transform_point3(face.p1),
                 transform.transform_point3(face.p2),
@@ -221,9 +261,9 @@ impl Brush {
 
     fn create_nodes(face: Face, faces: &mut [Face], nodes: &mut Slab<Node>) -> usize {
         let plane = Plane::from_face(face);
-        let (_, faces) = partition::partition(faces, |v| {
-            matches!(plane.classify_face(*v), FaceIntersect::Coplanar)
-        });
+        // let (_, faces) = partition::partition(faces, |v| {
+        //     matches!(plane.classify_face(*v), FaceIntersect::Coplanar)
+        // });
 
         let (front, back) = partition::partition(faces, |v| match plane.classify_face(*v) {
             FaceIntersect::Front => true,
@@ -231,6 +271,8 @@ impl Brush {
             FaceIntersect::Coplanar => unreachable!(),
             FaceIntersect::Intersect => panic!("overlapping faces"),
         });
+
+        // let (front, back) = partition::partition(faces, |v| plane.touching_or_front(face));
 
         let front = if let [face, rest @ ..] = front {
             Some(Self::create_nodes(*face, rest, nodes))

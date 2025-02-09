@@ -10,7 +10,7 @@ partition = "0.1"
 itertools = "0.14"
 thiserror = "2.0"
 tracing = "0.1"
-tracing-subscriber = "0.3"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
 ivy-engine = { git = "https://github.com/ten3roberts/ivy" }

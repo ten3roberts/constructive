@@ -99,7 +99,7 @@ impl Plugin for ExamplePlugin {
         ];
 
         for clip in &clip_brushes {
-            brush = clip.create_tree().clip_brush(brush);
+            brush = clip.create_tree().clip_brush(&brush);
         }
 
         let flat_material = PbrMaterialData::new();
