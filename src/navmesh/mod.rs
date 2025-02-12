@@ -38,6 +38,7 @@ impl Default for NavmeshSettings {
 
 pub struct Navmesh {
     polygons: Slab<Face>,
+    polygon_links: BTreeMap<usize, Vec<usize>>,
     links: Slab<NavmeshLink>,
     settings: NavmeshSettings,
 }
@@ -74,7 +75,9 @@ impl Navmesh {
             }
 
             for &face in brush.faces() {
-                output_faces.insert(face);
+                if face.normal().dot(Vec3::Y) > settings.max_slope_cosine {
+                    output_faces.insert(face);
+                }
             }
             brushes[i] = brush;
         }
@@ -83,6 +86,7 @@ impl Navmesh {
             settings,
             polygons: output_faces,
             links: Slab::new(),
+            polygon_links: Default::default(),
         }
     }
 
@@ -92,11 +96,33 @@ impl Navmesh {
             .filter(|(_, v)| v.normal().dot(Vec3::Y) > self.settings.max_slope_cosine)
     }
 
+    pub fn closest_polygon(&self, point: Vec3) -> Option<(usize, Face)> {
+        self.polygons
+            .iter()
+            .filter(|v| v.1.contains_point(point))
+            .map(|v| (v.0, v.1, v.1.distance_to_plane(point)))
+            // .filter(|v| v.2 >= -TOLERANCE)
+            .min_by_key(|v| ordered_float::OrderedFloat(v.2))
+            .map(|(index, &face, _)| (index, face))
+    }
+
     pub fn generate_links(&mut self) {
         let mut edgeplanes: BTreeMap<_, EdgeLinkPlane> = BTreeMap::new();
 
+        let mut create_link = |link: NavmeshLink| {
+            let index = self.links.insert(link);
+            self.polygon_links
+                .entry(link.from())
+                .or_default()
+                .push(index);
+
+            let index = self.links.insert(link.reverse());
+
+            self.polygon_links.entry(link.to()).or_default().push(index);
+        };
+
         // Assign edge to vertplanes
-        for (id, face) in self.walkable_polygons() {
+        for (id, face) in &self.polygons {
             for (p1, p2) in face.edges() {
                 let edge = PolygonEdge::new(id, p1, p2);
 
@@ -177,7 +203,7 @@ impl Navmesh {
                             let d_low = vec2(step_down.min, m_d * step_down.min + c_d);
                             let d_high = vec2(step_down.max, m_d * step_down.max + c_d);
 
-                            self.links.insert(NavmeshLink::new(
+                            create_link(NavmeshLink::new(
                                 front_edge.polygon(),
                                 back_edge.polygon(),
                                 LinkKind::StepUp(
@@ -200,7 +226,7 @@ impl Navmesh {
                             let d_low = vec2(step_up.min, m_d * step_up.min + c_d);
                             let d_high = vec2(step_up.max, m_d * step_up.max + c_d);
 
-                            self.links.insert(NavmeshLink::new(
+                            create_link(NavmeshLink::new(
                                 front_edge.polygon(),
                                 back_edge.polygon(),
                                 LinkKind::StepUp(
@@ -223,7 +249,7 @@ impl Navmesh {
                         let d2 = vec2(overlap.max, m_d * overlap.max + c_d);
 
                         if delta_c > TOLERANCE {
-                            self.links.insert(NavmeshLink::new(
+                            create_link(NavmeshLink::new(
                                 back_edge.polygon(),
                                 front_edge.polygon(),
                                 LinkKind::StepUp(
@@ -238,7 +264,7 @@ impl Navmesh {
                                 ),
                             ));
                         } else if delta_c < -TOLERANCE {
-                            self.links.insert(NavmeshLink::new(
+                            create_link(NavmeshLink::new(
                                 front_edge.polygon(),
                                 back_edge.polygon(),
                                 LinkKind::StepUp(
@@ -253,7 +279,7 @@ impl Navmesh {
                                 ),
                             ));
                         } else {
-                            self.links.insert(NavmeshLink::new(
+                            create_link(NavmeshLink::new(
                                 front_edge.polygon(),
                                 back_edge.polygon(),
                                 LinkKind::Walk(Edge3D::new(
@@ -266,6 +292,16 @@ impl Navmesh {
                 }
             }
         }
+
+        self.polygon_links.clear();
+        for (index, link) in &self.links {
+            self.polygon_links
+                .entry(link.from())
+                .or_default()
+                .push(index);
+
+            self.polygon_links.entry(link.to()).or_default().push(index);
+        }
     }
 
     pub fn polygons(&self) -> &Slab<Face> {
@@ -274,6 +310,10 @@ impl Navmesh {
 
     pub fn links(&self) -> &Slab<NavmeshLink> {
         &self.links
+    }
+
+    pub fn polygon_links(&self) -> &BTreeMap<usize, Vec<usize>> {
+        &self.polygon_links
     }
 }
 

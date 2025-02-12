@@ -5,7 +5,6 @@ use itertools::Itertools;
 use slab::Slab;
 
 use crate::{
-    edgelist::VerticalPlane,
     tree::{BspTree, Node},
     util::TOLERANCE,
 };
@@ -181,6 +180,11 @@ impl Face {
             transform.transform_point3(self.p2),
             transform.transform_point3(self.p3),
         )
+    }
+
+    pub fn distance_to_plane(&self, point: Vec3) -> f32 {
+        let normal = self.normal();
+        normal.dot(point) - self.p1.dot(normal)
     }
 
     pub fn contains_point(&self, point: Vec3) -> bool {

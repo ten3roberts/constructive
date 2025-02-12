@@ -1,5 +1,6 @@
 use glam::Vec3;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Edge3D {
     pub p1: Vec3,
     pub p2: Vec3,

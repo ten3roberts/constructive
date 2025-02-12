@@ -1,6 +1,7 @@
 use std::mem;
 
 use csg_nav::{
+    astar::astar,
     brush::Brush,
     link::LinkKind,
     navmesh::{Navmesh, NavmeshSettings},
@@ -14,7 +15,7 @@ use ivy_engine::{
     input::layer::InputLayer,
     ivy_assets::AssetCache,
     ivy_core::{
-        gizmos::{DrawGizmos, Line, Triangle},
+        gizmos::{DrawGizmos, Line, Sphere, Triangle},
         palette::{Srgb, Srgba},
         update_layer::{FixedTimeStep, Plugin, ScheduledLayer},
         Color, ColorExt, EngineLayer, EntityBuilderExt, DEG_45,
@@ -130,33 +131,33 @@ impl Plugin for ExamplePlugin {
             let gizmos = world.get(engine(), gizmos())?;
             let mut section = gizmos.begin_section("navmesh_links");
 
-            const LINE_THICKNESS: f32 = 0.01;
-            for (_, link) in navmesh.links() {
-                match link.kind() {
-                    LinkKind::Walk(edge) => {
-                        let line =
-                            Line::from_points(edge.p1, edge.p2, LINE_THICKNESS, Color::cyan());
-                        section.draw(line);
-                    }
-                    LinkKind::StepUp(bot, top) => {
-                        let bot_line =
-                            Line::from_points(bot.p1, bot.p2, LINE_THICKNESS, Color::orange());
+            const LINE_THICKNESS: f32 = 0.005;
+            // for (_, link) in navmesh.links() {
+            //     match link.kind() {
+            //         LinkKind::Walk(edge) => {
+            //             let line =
+            //                 Line::from_points(edge.p1, edge.p2, LINE_THICKNESS, Color::cyan());
+            //             section.draw(line);
+            //         }
+            //         LinkKind::StepUp(bot, top) => {
+            //             let bot_line =
+            //                 Line::from_points(bot.p1, bot.p2, LINE_THICKNESS, Color::orange());
 
-                        let top_line =
-                            Line::from_points(top.p1, top.p2, LINE_THICKNESS, Color::orange());
+            //             let top_line =
+            //                 Line::from_points(top.p1, top.p2, LINE_THICKNESS, Color::orange());
 
-                        let support_1 =
-                            Line::from_points(bot.p1, top.p1, LINE_THICKNESS, Color::orange());
-                        let support_2 =
-                            Line::from_points(bot.p2, top.p2, LINE_THICKNESS, Color::orange());
+            //             let support_1 =
+            //                 Line::from_points(bot.p1, top.p1, LINE_THICKNESS, Color::orange());
+            //             let support_2 =
+            //                 Line::from_points(bot.p2, top.p2, LINE_THICKNESS, Color::orange());
 
-                        section.draw(top_line);
-                        section.draw(bot_line);
-                        section.draw(support_1);
-                        section.draw(support_2);
-                    }
-                }
-            }
+            //             section.draw(top_line);
+            //             section.draw(bot_line);
+            //             section.draw(support_1);
+            //             section.draw(support_2);
+            //         }
+            //     }
+            // }
         }
 
         let flat_material =
@@ -245,16 +246,40 @@ impl Plugin for ExamplePlugin {
                     .get(start_point, world_transform())?
                     .transform_point3(Vec3::ZERO);
 
-                let _end_pos = world
-                    .get(start_point, world_transform())?
+                let end_pos = world
+                    .get(end_point, world_transform())?
                     .transform_point3(Vec3::ZERO);
 
-                for (_, face) in navmesh.walkable_polygons() {
-                    if face.contains_point(start_pos) {
-                        for edge in face.edges() {
-                            gizmos.draw(Line::from_points(edge.0, edge.1, 0.02, Color::red()));
-                        }
+                if let Some((_, face)) = navmesh.closest_polygon(start_pos) {
+                    for edge in face.edges() {
+                        gizmos.draw(Line::from_points(
+                            edge.0,
+                            edge.1,
+                            0.02,
+                            Color::new(0.0, 0.5, 0.0, 1.0),
+                        ));
                     }
+                }
+
+                if let Some((_, face)) = navmesh.closest_polygon(end_pos) {
+                    for edge in face.edges() {
+                        gizmos.draw(Line::from_points(edge.0, edge.1, 0.02, Color::red()));
+                    }
+                }
+
+                let path = astar(&navmesh, start_pos, end_pos, |a, b| a.distance(b));
+
+                tracing::info!("{path:#?}");
+
+                for (from, to) in path.iter().flatten().tuple_windows() {
+                    gizmos.draw(Line::from_points(
+                        from.point(),
+                        to.point(),
+                        0.04,
+                        Color::blue(),
+                    ));
+
+                    gizmos.draw(Sphere::new(to.point(), 0.1, Color::blue()));
                 }
 
                 anyhow::Ok(())
