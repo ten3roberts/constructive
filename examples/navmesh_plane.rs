@@ -107,9 +107,9 @@ impl Plugin for ExamplePlugin {
             (
                 Mat4::from_rotation_translation(
                     Quat::from_axis_angle(Vec3::Y, 2.0),
-                    vec3(3.0, 0.5, 4.0),
+                    vec3(3.0, 0.3, 4.0),
                 ),
-                Brush::cube(),
+                Brush::cube().with_transform(Mat4::from_scale(vec3(4.0, 1.0, 1.0))),
             ),
             (
                 Mat4::from_rotation_translation(
@@ -132,32 +132,32 @@ impl Plugin for ExamplePlugin {
             let mut section = gizmos.begin_section("navmesh_links");
 
             const LINE_THICKNESS: f32 = 0.005;
-            // for (_, link) in navmesh.links() {
-            //     match link.kind() {
-            //         LinkKind::Walk(edge) => {
-            //             let line =
-            //                 Line::from_points(edge.p1, edge.p2, LINE_THICKNESS, Color::cyan());
-            //             section.draw(line);
-            //         }
-            //         LinkKind::StepUp(bot, top) => {
-            //             let bot_line =
-            //                 Line::from_points(bot.p1, bot.p2, LINE_THICKNESS, Color::orange());
+            for (_, link) in navmesh.links() {
+                match link.kind() {
+                    LinkKind::Walk(edge) => {
+                        // let line =
+                        //     Line::from_points(edge.p1, edge.p2, LINE_THICKNESS, Color::cyan());
+                        // section.draw(line);
+                    }
+                    LinkKind::StepUp(bot, top) => {
+                        let bot_line =
+                            Line::from_points(bot.p1, bot.p2, LINE_THICKNESS, Color::orange());
 
-            //             let top_line =
-            //                 Line::from_points(top.p1, top.p2, LINE_THICKNESS, Color::orange());
+                        let top_line =
+                            Line::from_points(top.p1, top.p2, LINE_THICKNESS, Color::orange());
 
-            //             let support_1 =
-            //                 Line::from_points(bot.p1, top.p1, LINE_THICKNESS, Color::orange());
-            //             let support_2 =
-            //                 Line::from_points(bot.p2, top.p2, LINE_THICKNESS, Color::orange());
+                        let support_1 =
+                            Line::from_points(bot.p1, top.p1, LINE_THICKNESS, Color::orange());
+                        let support_2 =
+                            Line::from_points(bot.p2, top.p2, LINE_THICKNESS, Color::orange());
 
-            //             section.draw(top_line);
-            //             section.draw(bot_line);
-            //             section.draw(support_1);
-            //             section.draw(support_2);
-            //         }
-            //     }
-            // }
+                        section.draw(top_line);
+                        section.draw(bot_line);
+                        section.draw(support_1);
+                        section.draw(support_2);
+                    }
+                }
+            }
         }
 
         let flat_material =
@@ -200,7 +200,7 @@ impl Plugin for ExamplePlugin {
         let start_point = Entity::builder()
             .mount(
                 TransformBundle::default()
-                    .with_position(Vec3::Y)
+                    .with_position(vec3(8.0, 1.0, 8.0))
                     .with_scale(Vec3::ONE * 0.2),
             )
             .mount(RenderObjectBundle::new(
@@ -214,7 +214,7 @@ impl Plugin for ExamplePlugin {
                 )],
             ))
             .mount(RigidBodyBundle::new(RigidBodyType::Dynamic).with_mass(1.0))
-            .mount(ColliderBundle::new(SharedShape::ball(1.0)))
+            .mount(ColliderBundle::new(SharedShape::ball(0.2)))
             .spawn(world);
 
         let end_point = Entity::builder()
@@ -234,7 +234,7 @@ impl Plugin for ExamplePlugin {
                 )],
             ))
             .mount(RigidBodyBundle::new(RigidBodyType::Dynamic).with_mass(1.0))
-            .mount(ColliderBundle::new(SharedShape::ball(1.0)))
+            .mount(ColliderBundle::new(SharedShape::ball(0.2)))
             .spawn(world);
 
         events

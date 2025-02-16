@@ -1,6 +1,7 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, BinaryHeap};
 
 use glam::Vec3;
+use itertools::Itertools;
 
 use crate::{link::NavmeshLink, navmesh::Navmesh, util::TOLERANCE};
 
@@ -62,7 +63,7 @@ where
         // Generate backtrace and terminate
         if current.node == end_node {
             contruct_backtrace(end, current.node, backtraces, &mut path);
-            // shorten(navmesh, path);
+            shorten(navmesh, &mut path);
             // resolve_clip(portals, path, info.agent_radius);
 
             return Some(path);
@@ -86,13 +87,23 @@ where
 
                 // Distance to each of the nodes
                 let (p1, p2) = (link.destination_edge().p1, link.destination_edge().p2);
+                let midpoint = (p1 + p2) / 2.0;
                 let p1_dist = (heuristic)(p1, end);
                 let p2_dist = (heuristic)(p2, end);
+                let midpoint_dist = (heuristic)(midpoint, end);
 
                 // let p = if portal.normal().dot(end_rel) > 0.0 {
                 //     portal.clip(current.point, end, info.agent_radius)
-                let p = if p1_dist < p2_dist { p1 } else { p2 };
+                let p = if let Some(p) = link
+                    .destination_edge()
+                    .intersect_ray_clipped(current.point, end - current.point)
+                {
+                    p
+                } else {
+                    midpoint
+                };
 
+                // let p = midpoint;
                 let backtrace = Backtrace::new(portal, link, p, &current, (heuristic)(p, end));
 
                 // Update backtrace
@@ -250,32 +261,47 @@ fn resolve_clip(navmesh: &Navmesh, path: &mut [Waypoint], margin: f32) {
     // resolve_clip(portals, &mut path[1..], margin)
 }
 
-fn shorten(navmesh: &Navmesh, path: &mut [Waypoint]) -> bool {
-    if path.len() < 3 {
-        return true;
+fn shorten(navmesh: &Navmesh, path: &mut [Waypoint]) {
+    for _ in 0..100 {
+        let mut shortened = 0;
+        for i in 0..path.len() {
+            let [a, b, c, ..] = &mut path[i..] else {
+                break;
+            };
+
+            // let a = &path[0];
+            // let b = &path[1];
+            // let c = &path[2];
+
+            if let Some(edge) = b.edge {
+                let portal = navmesh.links()[edge];
+                // c was directly visible from a
+                let edge = portal.destination_edge();
+                if let Some(p) = edge.intersect_ray_clipped(a.point, c.point - a.point) {
+                    let prev = b.point;
+                    if (prev.distance_squared(p)) > TOLERANCE {
+                        path[i + 1].point = p;
+                        shortened += 1;
+                    }
+
+                    // // // Try to shorten the next strip.
+                    // // // If successful, retry shortening for this strip
+                    // // if shorten(navmesh, &mut path[1..]) && prev.distance_squared(p) > TOLERANCE {
+                    // //     shorten(navmesh, path);
+                    // // }
+
+                    // return shorten(navmesh, &mut path[1..]);
+                }
+
+                // return shorten(navmesh, &mut path[1..]);
+            }
+        }
+
+        if shortened == 0 {
+            break;
+        }
     }
 
-    let a = &path[0];
-    let b = &path[1];
-    let c = &path[2];
-
-    // if let Some(edge) = b.edge {
-    //     let portal = navmesh.links()[edge];
-    //     // c was directly visible from a
-    //     if let Some(p) = portal.try_clip(a.point, c.point, agent_radius) {
-    //         let prev = b.point;
-
-    //         path[1].point = p;
-
-    //         // Try to shorten the next strip.
-    //         // If successful, retry shortening for this strip
-    //         if shorten(navmesh, &mut path[1..]) && prev.distance_squared(p) > TOLERANCE {
-    //             shorten(navmesh, path);
-    //         }
-
-    //         return true;
-    //     }
-    // }
-
-    shorten(navmesh, &mut path[1..])
+    // shorten(navmesh, &mut path[1..]);
+    // return false;
 }

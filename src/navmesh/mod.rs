@@ -109,6 +109,9 @@ impl Navmesh {
     pub fn generate_links(&mut self) {
         let mut edgeplanes: BTreeMap<_, EdgeLinkPlane> = BTreeMap::new();
 
+        self.polygon_links.clear();
+        self.links.clear();
+
         let mut create_link = |link: NavmeshLink| {
             let index = self.links.insert(link);
             self.polygon_links
@@ -131,7 +134,7 @@ impl Navmesh {
                 let canonical_plane = plane.canonicalize();
 
                 let disc_angle = (((canonical_plane.angle + TAU) % TAU) * 1024.0).round() as u32;
-                let distance = (canonical_plane.distance * 1024.0).round() as i32;
+                let distance = (canonical_plane.distance * 256.0).round() as i32;
 
                 tracing::info!(disc_angle, distance);
 
@@ -291,16 +294,6 @@ impl Navmesh {
                     }
                 }
             }
-        }
-
-        self.polygon_links.clear();
-        for (index, link) in &self.links {
-            self.polygon_links
-                .entry(link.from())
-                .or_default()
-                .push(index);
-
-            self.polygon_links.entry(link.to()).or_default().push(index);
         }
     }
 

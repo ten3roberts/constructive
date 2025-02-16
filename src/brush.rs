@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::f32::{consts::PI, EPSILON};
 
 use glam::{Mat4, Vec3, Vec4, Vec4Swizzles};
 use itertools::Itertools;
@@ -30,6 +30,18 @@ impl Plane {
 
     pub fn distance_to_point(&self, point: Vec3) -> f32 {
         point.dot(self.normal) - self.distance
+    }
+
+    pub fn intersect_ray(&self, ray_origin: Vec3, ray_direction: Vec3) -> Option<f32> {
+        let denom = self.normal.dot(ray_direction);
+        if denom.abs() > EPSILON {
+            let t = (self.normal * self.distance - ray_origin).dot(self.normal) / denom;
+            if t >= 0.0 {
+                return Some(t);
+            }
+        }
+
+        None
     }
 
     pub fn classify_face(&self, face: Face) -> FaceIntersect {
@@ -194,7 +206,7 @@ impl Face {
         let bc = (point - self.p2).dot((self.p3 - self.p2).cross(normal));
         let ca = (point - self.p3).dot((self.p1 - self.p3).cross(normal));
 
-        ab < 0.0 && bc < 0.0 && ca < 0.0
+        ab <= 0.0 && bc <= 0.0 && ca <= 0.0
     }
 
     pub(crate) fn map(&self, mut f: impl FnMut(Vec3) -> Vec3) -> Face {
