@@ -5,6 +5,7 @@ use itertools::Itertools;
 use slab::Slab;
 
 use crate::{
+    astar::{astar, Waypoint},
     brush::{Brush, Face},
     edge::Edge3D,
     edgelist::{PolygonEdge, VerticalPlane},
@@ -14,7 +15,7 @@ use crate::{
     util::TOLERANCE,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct NavmeshSettings {
     pub max_step_height: f32,
     pub max_slope_cosine: f32,
@@ -109,6 +110,10 @@ impl Navmesh {
             .map(|(index, &face, _)| (index, face))
     }
 
+    pub fn find_path(&self, start: Vec3, end: Vec3) -> Option<Vec<Waypoint>> {
+        astar(self, start, end, |a, b| a.distance(b))
+    }
+
     pub fn generate_links(&mut self) {
         let mut edgeplanes: BTreeMap<_, EdgeLinkPlane> = BTreeMap::new();
 
@@ -138,8 +143,6 @@ impl Navmesh {
 
                 let disc_angle = (((canonical_plane.angle + TAU) % TAU) * 1024.0).round() as u32;
                 let distance = (canonical_plane.distance * 256.0).round() as i32;
-
-                tracing::info!(disc_angle, distance);
 
                 if plane.normal.dot(canonical_plane.normal) > 0.0 {
                     edgeplanes

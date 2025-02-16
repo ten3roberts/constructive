@@ -670,6 +670,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "constructive"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "glam 0.28.0",
+ "image",
+ "itertools 0.14.0",
+ "ivy-engine",
+ "ordered-float",
+ "partition",
+ "slab",
+ "thiserror 2.0.11",
+ "tracing",
+ "tracing-subscriber",
+ "winit",
+]
+
+[[package]]
 name = "cordyceps"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -812,24 +830,6 @@ name = "crunchy"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43da5946c66ffcc7745f48db692ffbb10a83bfe0afd96235c5c2a4fb23994929"
-
-[[package]]
-name = "csg-nav"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "glam 0.28.0",
- "image",
- "itertools 0.14.0",
- "ivy-engine",
- "ordered-float",
- "partition",
- "slab",
- "thiserror 2.0.11",
- "tracing",
- "tracing-subscriber",
- "winit",
-]
 
 [[package]]
 name = "cursor-icon"
@@ -1812,6 +1812,26 @@ dependencies = [
  "slotmap",
  "thiserror 1.0.69",
  "tracing",
+]
+
+[[package]]
+name = "ivy-constructive"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "constructive",
+ "flax",
+ "glam 0.28.0",
+ "image",
+ "itertools 0.14.0",
+ "ivy-engine",
+ "ordered-float",
+ "partition",
+ "slab",
+ "thiserror 2.0.11",
+ "tracing",
+ "tracing-subscriber",
+ "winit",
 ]
 
 [[package]]

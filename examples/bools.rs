@@ -1,4 +1,4 @@
-use csg_nav::brush::Brush;
+use constructive::{brush::Brush, tree::BspTree};
 use glam::{vec3, Mat4, Quat, Vec2, Vec3};
 use ivy_engine::{
     flax::{Entity, World},
@@ -78,6 +78,7 @@ impl Plugin for ExamplePlugin {
     ) -> anyhow::Result<()> {
         let mut brush = Brush::cube();
         brush.transform(Mat4::from_scale(vec3(10.0, 0.4, 10.0)));
+        let mut brush = BspTree::build(brush.faces()).unwrap();
 
         let clip_brushes = [
             Brush::cube().with_transform(Mat4::from_rotation_translation(
@@ -99,7 +100,7 @@ impl Plugin for ExamplePlugin {
         ];
 
         for clip in &clip_brushes {
-            brush = clip.create_tree().clip_brush(&brush);
+            brush.clip_to(&BspTree::build(clip.faces()).unwrap());
         }
 
         let flat_material = PbrMaterialData::new();
@@ -107,7 +108,7 @@ impl Plugin for ExamplePlugin {
         Entity::builder()
             .mount(TransformBundle::default())
             .mount(RenderObjectBundle::new(
-                MeshDesc::Content(assets.insert(brush_to_mesh(&brush))),
+                MeshDesc::Content(assets.insert(brush_to_mesh(&Brush::new(brush.polygons())))),
                 &[(
                     forward_pass(),
                     MaterialData::UnlitMaterial(flat_material.clone()),

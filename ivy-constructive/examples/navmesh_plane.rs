@@ -1,6 +1,6 @@
 use std::mem;
 
-use csg_nav::{
+use constructive::{
     astar::astar,
     brush::Brush,
     link::LinkKind,
@@ -8,6 +8,10 @@ use csg_nav::{
 };
 use glam::{vec3, Mat4, Quat, Vec2, Vec3};
 use itertools::Itertools;
+use ivy_constructive::{
+    components::{self, navmesh},
+    plugin::{NavmeshDebugPlugin, NavmeshPlugin},
+};
 use ivy_engine::{
     engine,
     flax::{Entity, Query, System, World},
@@ -71,6 +75,8 @@ pub fn main() -> anyhow::Result<()> {
             ScheduledLayer::new(FixedTimeStep::new(0.02))
                 .with_plugin(OrbitCameraPlugin)
                 .with_plugin(RayPickingPlugin)
+                .with_plugin(NavmeshPlugin::new(NavmeshSettings::default()))
+                .with_plugin(NavmeshDebugPlugin)
                 .with_plugin(ExamplePlugin)
                 .with_plugin(PhysicsPlugin::new().with_gravity(Vec3::ZERO)),
         )
@@ -96,79 +102,56 @@ impl Plugin for ExamplePlugin {
     ) -> anyhow::Result<()> {
         let brushes = [
             (
-                Mat4::IDENTITY,
+                TransformBundle::default(),
                 Brush::cube().with_transform(Mat4::from_scale(vec3(10.0, 0.4, 10.0))),
             ),
             (
-                Mat4::from_rotation_translation(Quat::IDENTITY, vec3(-10.0, 0.0, -10.0)),
+                TransformBundle::default().with_position(vec3(-10.0, 0.5, -10.0)),
                 Brush::cube().with_transform(Mat4::from_scale(vec3(5.0, 0.4, 5.0))),
             ),
             (
-                Mat4::from_rotation_translation(Quat::IDENTITY, vec3(-10.0, 0.0, -10.0)),
+                TransformBundle::default().with_position(vec3(-10.0, 0.0, -10.0)),
                 Brush::cube().with_transform(Mat4::from_scale(vec3(1.0, 5.0, 1.0))),
             ),
             (
-                Mat4::from_rotation_translation(Quat::IDENTITY, vec3(0.5, -0.2, -0.5)),
+                TransformBundle::default().with_position(vec3(0.5, -0.2, -0.5)),
                 Brush::cube(),
             ),
             (
-                Mat4::from_rotation_translation(
-                    Quat::from_axis_angle(Vec3::Y, 2.0),
-                    vec3(3.0, 0.3, 4.0),
-                ),
+                TransformBundle::default()
+                    .with_position(vec3(3.0, 0.3, 4.0))
+                    .with_rotation(Quat::from_axis_angle(Vec3::Y, 2.0)),
                 Brush::cube().with_transform(Mat4::from_scale(vec3(4.0, 1.0, 2.0))),
             ),
             (
-                Mat4::from_rotation_translation(
-                    Quat::from_axis_angle(Vec3::X, DEG_45),
-                    vec3(-3.0, 0.4, 4.0),
-                ),
+                TransformBundle::default()
+                    .with_position(vec3(-3.0, 0.4, 4.0))
+                    .with_rotation(Quat::from_axis_angle(Vec3::X, DEG_45)),
                 Brush::cube(),
             ),
         ];
 
-        let mut navmesh = Navmesh::new(
-            NavmeshSettings::default(),
-            brushes.iter().map(|(a, b)| (*a, b)),
-        );
+        for (transform, brush) in brushes {
+            let flat_material = PbrMaterialData::new()
+                .with_albedo(TextureData::srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)));
 
-        navmesh.generate_links();
-
-        {
-            let gizmos = world.get(engine(), gizmos())?;
-            let mut section = gizmos.begin_section("navmesh_links");
-
-            const LINE_THICKNESS: f32 = 0.005;
-            for (_, link) in navmesh.links() {
-                match link.kind() {
-                    LinkKind::Walk(edge) => {
-                        // let line =
-                        //     Line::from_points(edge.p1, edge.p2, LINE_THICKNESS, Color::cyan());
-                        // section.draw(line);
-                    }
-                    LinkKind::StepUp(bot, top) => {
-                        let bot_line =
-                            Line::from_points(bot.p1, bot.p2, LINE_THICKNESS, Color::orange());
-
-                        let top_line =
-                            Line::from_points(top.p1, top.p2, LINE_THICKNESS, Color::orange());
-
-                        let support_1 =
-                            Line::from_points(bot.p1, top.p1, LINE_THICKNESS, Color::orange());
-                        let support_2 =
-                            Line::from_points(bot.p2, top.p2, LINE_THICKNESS, Color::orange());
-
-                        section.draw(top_line);
-                        section.draw(bot_line);
-                        section.draw(support_1);
-                        section.draw(support_2);
-                    }
-                }
-            }
+            Entity::builder()
+                .mount(transform)
+                .mount(RenderObjectBundle::new(
+                    MeshDesc::Content(assets.insert(brush_to_mesh(&brush))),
+                    &[(
+                        forward_pass(),
+                        MaterialData::PbrMaterial(flat_material.clone()),
+                    )],
+                ))
+                .set(components::brushes(), vec![brush])
+                .spawn(world);
         }
 
-        let flat_material =
-            PbrMaterialData::new().with_albedo(TextureData::srgba(Srgba::new(0.0, 0.5, 1.0, 0.5)));
+        {
+            // let gizmos = world.get(engine(), gizmos())?;
+            // let mut section = gizmos.begin_section("navmesh_links");
+        }
 
         Entity::builder()
             .mount(TransformBundle::default().with_rotation(Quat::from_axis_angle(Vec3::X, -1.0)))
@@ -177,31 +160,6 @@ impl Plugin for ExamplePlugin {
                 kind: LightKind::Directional,
                 cast_shadow: true,
             })
-            .spawn(world);
-
-        Entity::builder()
-            .mount(TransformBundle::default())
-            .mount(RenderObjectBundle::new(
-                MeshDesc::Content(assets.insert(navmesh_to_mesh(&navmesh))),
-                &[(
-                    forward_pass(),
-                    MaterialData::PbrMaterial(flat_material.clone()),
-                )],
-            ))
-            .spawn(world);
-
-        let flat_material =
-            PbrMaterialData::new().with_albedo(TextureData::srgba(Srgba::new(0.0, 0.5, 1.0, 1.0)));
-
-        Entity::builder()
-            .mount(TransformBundle::default())
-            .mount(RenderObjectBundle::new(
-                MeshDesc::Content(assets.insert(navmesh_to_mesh(&navmesh))),
-                &[(
-                    forward_pass(),
-                    MaterialData::WireframeMaterial(flat_material.clone()),
-                )],
-            ))
             .spawn(world);
 
         let start_point = Entity::builder()
@@ -248,6 +206,11 @@ impl Plugin for ExamplePlugin {
             .fixed_mut()
             .with_system(System::builder().with_world().build(move |world: &World| {
                 let gizmos = world.get(engine(), gizmos())?;
+                let Ok(navmesh) = world.get(engine(), navmesh()) else {
+                    tracing::warn!("no navmesh");
+                    return Ok(());
+                };
+
                 let mut gizmos = gizmos.begin_section("navmesh_example");
                 let start_pos = world
                     .get(start_point, world_transform())?
@@ -276,39 +239,15 @@ impl Plugin for ExamplePlugin {
 
                 let path = astar(&navmesh, start_pos, end_pos, |a, b| a.distance(b));
 
-                tracing::info!("{path:#?}");
-
+                let color = Color::new(0.5, 0.0, 0.0, 1.0);
                 for (from, to) in path.iter().flatten().tuple_windows() {
-                    gizmos.draw(Line::from_points(
-                        from.point(),
-                        to.point(),
-                        0.04,
-                        Color::blue(),
-                    ));
+                    gizmos.draw(Line::from_points(from.point(), to.point(), 0.04, color));
 
-                    gizmos.draw(Sphere::new(to.point(), 0.1, Color::blue()));
+                    gizmos.draw(Sphere::new(to.point(), 0.08, color));
                 }
 
                 anyhow::Ok(())
             }));
-
-        for (transform, brush) in brushes {
-            let flat_material = PbrMaterialData::new()
-                .with_albedo(TextureData::srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)));
-
-            Entity::builder()
-                .mount(TransformBundle::default())
-                .mount(RenderObjectBundle::new(
-                    MeshDesc::Content(
-                        assets.insert(brush_to_mesh(&brush.with_transform(transform))),
-                    ),
-                    &[
-                        (forward_pass(), MaterialData::PbrMaterial(flat_material)),
-                        (shadow_pass(), MaterialData::ShadowMaterial),
-                    ],
-                ))
-                .spawn(world);
-        }
 
         Ok(())
     }
@@ -328,32 +267,6 @@ fn brush_to_mesh(brush: &Brush) -> MeshData {
         .with_attribute(
             NORMAL_ATTRIBUTE,
             brush.faces().iter().flat_map(|v| {
-                let n = v.normal();
-                [n, n, n]
-            }),
-        )
-        .with_indices(0..vertex_count as u32);
-
-    mesh.generate_tangents().unwrap();
-    mesh
-}
-
-fn navmesh_to_mesh(navmesh: &Navmesh) -> MeshData {
-    let polygons = navmesh.walkable_polygons().collect_vec();
-    let vertex_count = polygons.len() * 3;
-
-    let mut mesh = MeshData::new()
-        .with_attribute(
-            POSITION_ATTRIBUTE,
-            polygons.iter().flat_map(|(_, v)| v.points()),
-        )
-        .with_attribute(
-            TEX_COORD_ATTRIBUTE,
-            (0..vertex_count as u32).map(|_| Vec2::ZERO),
-        )
-        .with_attribute(
-            NORMAL_ATTRIBUTE,
-            polygons.iter().flat_map(|(_, v)| {
                 let n = v.normal();
                 [n, n, n]
             }),
