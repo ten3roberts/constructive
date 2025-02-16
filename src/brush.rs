@@ -9,7 +9,7 @@ use crate::{
     util::TOLERANCE,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Plane {
     pub normal: Vec3,
     pub distance: f32,
@@ -34,7 +34,7 @@ impl Plane {
 
     pub fn intersect_ray(&self, ray_origin: Vec3, ray_direction: Vec3) -> Option<f32> {
         let denom = self.normal.dot(ray_direction);
-        if denom.abs() > EPSILON {
+        if denom.abs() > f32::EPSILON {
             let t = (self.normal * self.distance - ray_origin).dot(self.normal) / denom;
             if t >= 0.0 {
                 return Some(t);
@@ -49,32 +49,21 @@ impl Plane {
         let d2 = self.distance_to_point(face.p2);
         let d3 = self.distance_to_point(face.p3);
 
+        if d1.abs() <= TOLERANCE && d2.abs() <= TOLERANCE && d3.abs() <= TOLERANCE {
+            if face.normal().dot(self.normal) > 0.0 {
+                return FaceIntersect::CoplanarFront;
+            } else {
+                return FaceIntersect::CoplanarBack;
+            }
+        }
+
         if d1 >= -TOLERANCE && d2 >= -TOLERANCE && d3 >= -TOLERANCE {
             FaceIntersect::Front
         } else if d1 <= TOLERANCE && d2 <= TOLERANCE && d3 <= TOLERANCE {
             FaceIntersect::Back
-        } else if d1.abs() < TOLERANCE && d2.abs() < TOLERANCE && d3 <= -TOLERANCE {
-            FaceIntersect::Coplanar
         } else {
             FaceIntersect::Intersect
         }
-    }
-
-    pub fn touching_or_front(&self, face: Face) -> bool {
-        let d1 = self.distance_to_point(face.p1);
-        let d2 = self.distance_to_point(face.p2);
-        let d3 = self.distance_to_point(face.p3);
-
-        d1 >= -TOLERANCE && d2 >= -TOLERANCE && d3 >= -TOLERANCE
-        // if d1 >= TOLERANCE && d2 >= TOLERANCE && d3 >= TOLERANCE {
-        //     FaceIntersect::Front
-        // } else if d1 <= -TOLERANCE && d2 <= -TOLERANCE && d3 <= -TOLERANCE {
-        //     FaceIntersect::Back
-        // } else if d1.abs() < TOLERANCE && d2.abs() < TOLERANCE && d3 <= -TOLERANCE {
-        //     FaceIntersect::Coplanar
-        // } else {
-        //     FaceIntersect::Intersect
-        // }
     }
 
     pub fn split_face(
@@ -155,6 +144,13 @@ impl Plane {
             front_result.push(orient(Face::new(i1, front2, i2)));
         }
     }
+
+    pub(crate) fn invert(&self) -> Self {
+        Self {
+            normal: -self.normal,
+            distance: -self.distance,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -212,12 +208,17 @@ impl Face {
     pub(crate) fn map(&self, mut f: impl FnMut(Vec3) -> Vec3) -> Face {
         Self::new(f(self.p1), f(self.p2), f(self.p3))
     }
+
+    pub(crate) fn flip(&self) -> Self {
+        Self::new(self.p3, self.p2, self.p1)
+    }
 }
 
 pub enum FaceIntersect {
     Front,
     Back,
-    Coplanar,
+    CoplanarFront,
+    CoplanarBack,
     Intersect,
 }
 
@@ -229,16 +230,6 @@ pub struct Brush {
 impl Brush {
     pub fn new(faces: Vec<Face>) -> Self {
         Self { faces }
-    }
-
-    pub fn create_tree(&self) -> BspTree {
-        let mut faces = self.faces.to_vec();
-        let (face, rest) = faces.split_first_mut().unwrap();
-
-        let mut nodes = Slab::new();
-        let root = Self::create_nodes(*face, rest, &mut nodes);
-
-        BspTree::new(root, nodes)
     }
 
     pub fn to_triangle_list(&self) -> Vec<Vec3> {
@@ -263,9 +254,6 @@ impl Brush {
                 transform.transform_point3(face.p2),
                 transform.transform_point3(face.p3),
             );
-            // face.p1 = transform.transform_point3(face.p1);
-            // face.p2 = transform.transform_point3(face.p2);
-            // face.p3 = transform.transform_point3(face.p3);
         }
     }
 
@@ -273,37 +261,6 @@ impl Brush {
     pub fn with_transform(mut self, transform: Mat4) -> Self {
         self.transform(transform);
         self
-    }
-
-    fn create_nodes(face: Face, faces: &mut [Face], nodes: &mut Slab<Node>) -> usize {
-        let plane = Plane::from_face(face);
-        // let (_, faces) = partition::partition(faces, |v| {
-        //     matches!(plane.classify_face(*v), FaceIntersect::Coplanar)
-        // });
-
-        let (front, back) = partition::partition(faces, |v| match plane.classify_face(*v) {
-            FaceIntersect::Front => true,
-            FaceIntersect::Back => false,
-            FaceIntersect::Coplanar => unreachable!(),
-            FaceIntersect::Intersect => panic!("overlapping faces"),
-        });
-
-        // let (front, back) = partition::partition(faces, |v| plane.touching_or_front(face));
-
-        let front = if let [face, rest @ ..] = front {
-            Some(Self::create_nodes(*face, rest, nodes))
-        } else {
-            None
-        };
-
-        let back = if let [face, rest @ ..] = back {
-            Some(Self::create_nodes(*face, rest, nodes))
-        } else {
-            None
-        };
-
-        let node = Node::new(face, front, back);
-        nodes.insert(node)
     }
 
     pub fn plane() -> Self {
@@ -418,6 +375,8 @@ impl Brush {
 mod test {
     use glam::vec3;
 
+    use crate::tree::BspTree;
+
     use super::{Brush, Face};
 
     #[test]
@@ -434,7 +393,7 @@ mod test {
             Face::new(p3, p1, p4),
         ]);
 
-        let tree = brush.create_tree();
+        let tree = BspTree::build(brush.faces());
 
         eprintln!("{tree:#?}");
     }

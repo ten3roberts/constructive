@@ -29,7 +29,6 @@ use ivy_engine::{
         mesh::{MeshData, NORMAL_ATTRIBUTE, POSITION_ATTRIBUTE, TEX_COORD_ATTRIBUTE},
         texture::{TextureData, TextureDesc},
     },
-    ivy_ui::image,
     ivy_wgpu::{
         components::{forward_pass, shadow_pass},
         driver::WinitDriver,
@@ -101,6 +100,14 @@ impl Plugin for ExamplePlugin {
                 Brush::cube().with_transform(Mat4::from_scale(vec3(10.0, 0.4, 10.0))),
             ),
             (
+                Mat4::from_rotation_translation(Quat::IDENTITY, vec3(-10.0, 0.0, -10.0)),
+                Brush::cube().with_transform(Mat4::from_scale(vec3(5.0, 0.4, 5.0))),
+            ),
+            (
+                Mat4::from_rotation_translation(Quat::IDENTITY, vec3(-10.0, 0.0, -10.0)),
+                Brush::cube().with_transform(Mat4::from_scale(vec3(1.0, 5.0, 1.0))),
+            ),
+            (
                 Mat4::from_rotation_translation(Quat::IDENTITY, vec3(0.5, -0.2, -0.5)),
                 Brush::cube(),
             ),
@@ -109,7 +116,7 @@ impl Plugin for ExamplePlugin {
                     Quat::from_axis_angle(Vec3::Y, 2.0),
                     vec3(3.0, 0.3, 4.0),
                 ),
-                Brush::cube().with_transform(Mat4::from_scale(vec3(4.0, 1.0, 1.0))),
+                Brush::cube().with_transform(Mat4::from_scale(vec3(4.0, 1.0, 2.0))),
             ),
             (
                 Mat4::from_rotation_translation(

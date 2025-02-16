@@ -10,6 +10,7 @@ use crate::{
     edgelist::{PolygonEdge, VerticalPlane},
     link::{LinkKind, NavmeshLink},
     span::Span,
+    tree::BspTree,
     util::TOLERANCE,
 };
 
@@ -23,7 +24,7 @@ pub struct NavmeshSettings {
 impl NavmeshSettings {
     pub fn new() -> Self {
         Self {
-            max_step_height: 0.5,
+            max_step_height: 0.7,
             max_slope_cosine: 0.707,
             agent_radius: 0.2,
         }
@@ -50,44 +51,46 @@ impl Navmesh {
     ) -> Self {
         let agent_radius = settings.agent_radius;
 
-        let mut brushes = brushes
+        let brushes = brushes
             .into_iter()
-            .map(|(transform, brush)| {
-                Brush::new(
-                    brush
-                        .faces()
-                        .iter()
-                        .map(|face| {
-                            face.map(|p| transform.transform_point3(p + p.signum() * agent_radius))
-                        })
-                        .collect_vec(),
-                )
+            .filter_map(|(transform, brush)| {
+                // inflate and transform each brush
+                let faces = brush
+                    .faces()
+                    .iter()
+                    .map(|face| {
+                        face.map(|p| transform.transform_point3(p + p.signum() * agent_radius))
+                    })
+                    .collect_vec();
+
+                BspTree::build(&faces)
             })
             .collect_vec();
 
-        let mut output_faces = Slab::new();
-        for i in 0..brushes.len() {
-            let mut brush = brushes[i].clone();
-            for (j, clip_brush) in brushes.iter().enumerate() {
-                if i != j {
-                    brush = clip_brush.create_tree().clip_brush(&brush);
-                }
-            }
+        let tree = brushes.into_iter().reduce(|mut brush, other| {
+            brush.union(other);
+            brush
+        });
 
-            for &face in brush.faces() {
-                if face.normal().dot(Vec3::Y) > settings.max_slope_cosine {
-                    output_faces.insert(face);
-                }
-            }
-            brushes[i] = brush;
+        let mut output_faces = Slab::new();
+        for face in tree
+            .map(|v| v.polygons())
+            .into_iter()
+            .flatten()
+            .filter(|v| v.normal().dot(Vec3::Y) > settings.max_slope_cosine)
+        {
+            output_faces.insert(face);
         }
 
-        Self {
+        let mut this = Self {
             settings,
             polygons: output_faces,
             links: Slab::new(),
             polygon_links: Default::default(),
-        }
+        };
+
+        this.generate_links();
+        this
     }
 
     pub fn walkable_polygons(&self) -> impl Iterator<Item = (usize, &Face)> {
@@ -153,8 +156,6 @@ impl Navmesh {
                 }
             }
         }
-
-        tracing::info!("{edgeplanes:#?}");
 
         for plane in edgeplanes.values() {
             for back_edge in &plane.back {
