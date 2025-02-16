@@ -11,6 +11,6 @@ Navmesh generation and path finding using Constructive Solid Geometry
 - Automatic step links and level stitching
 
 # Examples
-![image](https://github.com/user-attachments/assets/efd26e75-1342-4339-b2b7-e91be0070483)
+![image](https://github.com/user-attachments/assets/3e7ec903-ebc4-4422-b9b3-98fc76a59a17)
 
 Rendered using [Ivy](https://github.com/ten3roberts/ivy)
