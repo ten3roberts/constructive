@@ -1,13 +1,13 @@
 # Constructive
 
-Pathfinding and Navmesh generation using Constructive Solid Geometry
+Navmesh generation and path finding using Constructive Solid Geometry
 
 ## Core Features
 
 - Generate navmesh from scene
 - Engine agnostic
 - Overlapping navmesh support
-- Anyangle path finding
+- Any angle path finding
 - Automatic step links and level stitching
 
 # Examples
