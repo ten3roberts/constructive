@@ -1,5 +1,3 @@
-use glam::{Vec2, Vec3};
-
 use crate::edge::Edge3D;
 
 /// Links two polygons of a navmesh together with an edge

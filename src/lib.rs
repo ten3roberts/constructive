@@ -4,6 +4,7 @@ pub mod edge;
 pub mod edgelist;
 pub mod link;
 pub mod navmesh;
+pub mod plane;
 pub mod span;
 pub mod tree;
 mod util;

@@ -1,11 +1,4 @@
-use std::mem;
-
-use constructive::{
-    astar::astar,
-    brush::Brush,
-    link::LinkKind,
-    navmesh::{Navmesh, NavmeshSettings},
-};
+use constructive::{astar::astar, brush::Brush, navmesh::NavmeshSettings};
 use glam::{vec3, Mat4, Quat, Vec2, Vec3};
 use itertools::Itertools;
 use ivy_constructive::{
@@ -14,12 +7,12 @@ use ivy_constructive::{
 };
 use ivy_engine::{
     engine,
-    flax::{Entity, Query, System, World},
+    flax::{Entity, System, World},
     gizmos,
     input::layer::InputLayer,
     ivy_assets::AssetCache,
     ivy_core::{
-        gizmos::{DrawGizmos, Line, Sphere, Triangle},
+        gizmos::{Line, Sphere},
         palette::{Srgb, Srgba},
         update_layer::{FixedTimeStep, Plugin, ScheduledLayer},
         Color, ColorExt, EngineLayer, EntityBuilderExt, DEG_45,
@@ -31,10 +24,10 @@ use ivy_engine::{
     },
     ivy_graphics::{
         mesh::{MeshData, NORMAL_ATTRIBUTE, POSITION_ATTRIBUTE, TEX_COORD_ATTRIBUTE},
-        texture::{TextureData, TextureDesc},
+        texture::TextureData,
     },
     ivy_wgpu::{
-        components::{forward_pass, shadow_pass},
+        components::forward_pass,
         driver::WinitDriver,
         layer::GraphicsLayer,
         light::{LightBundle, LightKind, LightParams},

@@ -1,8 +1,11 @@
 [package]
 name = "constructive"
 description = "Navmesh and path finding library based on constructive solid geometry"
-keywords = ["pathfinding", "navmesh", "astar", "csg", "gamedev", "agents"]
-version = "0.1.0"
+documentation = "https://docs.rs/constructive"
+repository = "https://github.com/ten3roberts/constructive"
+keywords = ["pathfinding", "navmesh", "astar", "csg", "gamedev"]
+license = "MIT"
+version = "0.0.1"
 edition = "2021"
 
 [workspace]
@@ -16,13 +19,10 @@ itertools = "0.14"
 thiserror = "2.0"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-ordered-float = "4.6"
+ordered-float = "5.0"
 
 [dev-dependencies]
 ivy-engine = { git = "https://github.com/ten3roberts/ivy" }
 winit = "0.30"
 anyhow = "1.0"
 image = "0.25"
-
-[patch.crates-io]
-violet = { git = "https://github.com/ten3roberts/violet", branch = "dev-ivy"}

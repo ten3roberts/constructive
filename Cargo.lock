@@ -671,14 +671,14 @@ dependencies = [
 
 [[package]]
 name = "constructive"
-version = "0.1.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "glam 0.28.0",
  "image",
  "itertools 0.14.0",
  "ivy-engine",
- "ordered-float",
+ "ordered-float 5.0.0",
  "partition",
  "slab",
  "thiserror 2.0.11",
@@ -1825,7 +1825,7 @@ dependencies = [
  "image",
  "itertools 0.14.0",
  "ivy-engine",
- "ordered-float",
+ "ordered-float 4.6.0",
  "partition",
  "slab",
  "thiserror 2.0.11",
@@ -1917,7 +1917,7 @@ dependencies = [
  "ivy-core",
  "ivy-graphics",
  "ivy-profiling",
- "ordered-float",
+ "ordered-float 4.6.0",
  "rayon",
  "tracing",
  "urlencoding",
@@ -1940,7 +1940,7 @@ dependencies = [
  "ivy-core",
  "ivy-profiling",
  "mikktspace",
- "ordered-float",
+ "ordered-float 4.6.0",
  "tracing",
 ]
 
@@ -2078,7 +2078,7 @@ dependencies = [
  "ivy-wgpu-types",
  "mikktspace",
  "naga_oil",
- "ordered-float",
+ "ordered-float 4.6.0",
  "parking_lot",
  "rayon",
  "slab",
@@ -2921,6 +2921,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ordered-float"
+version = "5.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2c1f9f56e534ac6a9b8a4600bdf0f530fb393b5f393e7b4d03489c3cf0c3f01"
+dependencies = [
+ "num-traits",
+]
+
+[[package]]
 name = "overload"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3005,7 +3014,7 @@ dependencies = [
  "nalgebra 0.33.2",
  "num-derive",
  "num-traits",
- "ordered-float",
+ "ordered-float 4.6.0",
  "rstar",
  "rustc-hash 2.1.0",
  "simba 0.9.0",
@@ -3347,7 +3356,7 @@ dependencies = [
  "nalgebra 0.33.2",
  "num-derive",
  "num-traits",
- "ordered-float",
+ "ordered-float 4.6.0",
  "parry3d",
  "rayon",
  "rustc-hash 2.1.0",
@@ -5208,8 +5217,3 @@ checksum = "99a5bab8d7dedf81405c4bb1f2b83ea057643d9cb28778cea9eecddeedd2e028"
 dependencies = [
  "zune-core",
 ]
-
-[[patch.unused]]
-name = "violet"
-version = "0.0.1"
-source = "git+https://github.com/ten3roberts/violet?branch=dev-ivy#3c5949370cb3f0ccc78c2ae0f03eb7a45e31f1e1"

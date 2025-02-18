@@ -69,7 +69,7 @@ pub struct NavmeshDebugPlugin;
 impl Plugin for NavmeshDebugPlugin {
     fn install(
         &self,
-        world: &mut World,
+        _: &mut World,
         assets: &AssetCache,
         schedules: &mut ivy_engine::ivy_core::update_layer::ScheduleSetBuilder,
     ) -> anyhow::Result<()> {
@@ -151,7 +151,7 @@ fn navmesh_gizmos(gizmos: &Gizmos, query: &mut QueryBorrow<Component<Navmesh>>) 
         const LINE_THICKNESS: f32 = 0.005;
         for (_, link) in navmesh.links() {
             match link.kind() {
-                LinkKind::Walk(edge) => {}
+                LinkKind::Walk(_) => {}
                 LinkKind::StepUp(bot, top) => {
                     let bot_line =
                         Line::from_points(bot.p1, bot.p2, LINE_THICKNESS, Color::orange());

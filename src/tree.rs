@@ -1,7 +1,10 @@
 use itertools::Itertools;
 use slab::Slab;
 
-use crate::brush::{Brush, Face, FaceIntersect, Plane};
+use crate::{
+    brush::{Face, FaceIntersect},
+    plane::Plane,
+};
 
 #[derive(Clone)]
 pub struct BspTree {

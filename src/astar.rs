@@ -1,7 +1,6 @@
 use std::collections::{btree_map::Entry, BTreeMap, BTreeSet, BinaryHeap};
 
 use glam::Vec3;
-use itertools::Itertools;
 
 use crate::{link::NavmeshLink, navmesh::Navmesh, util::TOLERANCE};
 
@@ -69,8 +68,6 @@ where
             return Some(path);
         }
 
-        let end_rel = end - current.point;
-
         // Add all edges to the open list and update backtraces
         let portals = navmesh
             .polygon_links()
@@ -87,20 +84,18 @@ where
 
                 // Distance to each of the nodes
                 let (p1, p2) = (link.destination_edge().p1, link.destination_edge().p2);
-                let midpoint = (p1 + p2) / 2.0;
                 let p1_dist = (heuristic)(p1, end);
                 let p2_dist = (heuristic)(p2, end);
-                let midpoint_dist = (heuristic)(midpoint, end);
 
-                // let p = if portal.normal().dot(end_rel) > 0.0 {
-                //     portal.clip(current.point, end, info.agent_radius)
                 let p = if let Some(p) = link
                     .destination_edge()
                     .intersect_ray_clipped(current.point, end - current.point)
                 {
                     p
+                } else if p1_dist < p2_dist {
+                    p1
                 } else {
-                    midpoint
+                    p2
                 };
 
                 // let p = midpoint;
@@ -209,15 +204,15 @@ impl Backtrace {
 }
 
 // Order by lowest total_cost
-impl<'a> PartialOrd for Backtrace {
+impl PartialOrd for Backtrace {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        other.total_cost.partial_cmp(&self.total_cost)
+        Some(self.cmp(other))
     }
 }
 
-impl<'a> Eq for Backtrace {}
+impl Eq for Backtrace {}
 
-impl<'a> Ord for Backtrace {
+impl Ord for Backtrace {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         other
             .total_cost
@@ -226,40 +221,40 @@ impl<'a> Ord for Backtrace {
     }
 }
 
-fn resolve_clip(navmesh: &Navmesh, path: &mut [Waypoint], margin: f32) {
-    if path.len() < 3 {
-        return;
-    }
+// fn resolve_clip(navmesh: &Navmesh, path: &mut [Waypoint], margin: f32) {
+//     if path.len() < 3 {
+//         return;
+//     }
 
-    let a = &path[0];
-    let c = &path[2];
-    let b = &mut path[1];
+//     let a = &path[0];
+//     let c = &path[2];
+//     let b = &mut path[1];
 
-    if let Some(portal) = b.edge {
-        let link = &navmesh.links()[portal];
-        let edge = link.destination_edge();
-        let p = edge.p1;
-        let q = edge.p2;
+//     if let Some(portal) = b.edge {
+//         let link = &navmesh.links()[portal];
+//         let edge = link.destination_edge();
+//         let p = edge.p1;
+//         let q = edge.p2;
 
-        if (b.point.distance(p) < margin + TOLERANCE) || (b.point.distance(q) < margin + TOLERANCE)
-        {
-            // let normal = portal.normal();
-            // let a_inc = (a.point - b.point)
-            //     .normalize_or_zero()
-            //     .perp_dot(normal)
-            //     .abs();
+//         if (b.point.distance(p) < margin + TOLERANCE) || (b.point.distance(q) < margin + TOLERANCE)
+//         {
+//             // let normal = portal.normal();
+//             // let a_inc = (a.point - b.point)
+//             //     .normalize_or_zero()
+//             //     .perp_dot(normal)
+//             //     .abs();
 
-            // let c_inc = (c.point - b.point)
-            //     .normalize_or_zero()
-            //     .perp_dot(normal)
-            //     .abs();
+//             // let c_inc = (c.point - b.point)
+//             //     .normalize_or_zero()
+//             //     .perp_dot(normal)
+//             //     .abs();
 
-            // b.point += normal * margin * (c_inc - a_inc)
-        }
-    }
+//             // b.point += normal * margin * (c_inc - a_inc)
+//         }
+//     }
 
-    // resolve_clip(portals, &mut path[1..], margin)
-}
+//     // resolve_clip(portals, &mut path[1..], margin)
+// }
 
 fn shorten(navmesh: &Navmesh, path: &mut [Waypoint]) {
     for _ in 0..100 {

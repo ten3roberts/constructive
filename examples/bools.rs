@@ -15,14 +15,12 @@ use ivy_engine::{
     },
     ivy_graphics::{
         mesh::{MeshData, NORMAL_ATTRIBUTE, POSITION_ATTRIBUTE, TEX_COORD_ATTRIBUTE},
-        texture::{TextureData, TextureDesc},
+        texture::TextureData,
     },
-    ivy_ui::image,
     ivy_wgpu::{
         components::forward_pass,
         driver::WinitDriver,
         layer::GraphicsLayer,
-        light::{LightBundle, LightKind, LightParams},
         material_desc::{MaterialData, PbrMaterialData},
         mesh_desc::MeshDesc,
         renderer::{EnvironmentData, RenderObjectBundle},
