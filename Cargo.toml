@@ -12,7 +12,7 @@ edition = "2021"
 members = ["ivy-constructive"]
 
 [dependencies]
-glam = "0.28"
+glam = "0.30"
 slab = "0.4"
 partition = "0.1"
 itertools = "0.14"
@@ -26,3 +26,8 @@ ivy-engine = { git = "https://github.com/ten3roberts/ivy" }
 winit = "0.30"
 anyhow = "1.0"
 image = "0.25"
+
+[patch.crates-io]
+flax = { git = "https://github.com/ten3roberts/flax" }
+nalgebra = { git = "https://github.com/ten3roberts/nalgebra" }
+
