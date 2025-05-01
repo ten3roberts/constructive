@@ -1,12 +1,12 @@
 use std::{collections::BTreeMap, f32::consts::TAU};
 
-use glam::{vec2, Mat4, Vec3};
+use glam::{vec2, Vec3};
 use itertools::Itertools;
 use slab::Slab;
 
 use crate::{
     astar::{astar, Waypoint},
-    brush::{Brush, Face},
+    brush::{Face, PositionedBrush},
     edge::Edge3D,
     edgelist::{PolygonEdge, VerticalPlane},
     link::{LinkKind, NavmeshLink},
@@ -39,7 +39,8 @@ impl Default for NavmeshSettings {
 }
 
 pub struct Navmesh {
-    polygons: Slab<Face>,
+    brush_polygons: Vec<Face>,
+    walkable_polygons: Slab<Face>,
     polygon_links: BTreeMap<usize, Vec<usize>>,
     links: Slab<NavmeshLink>,
     settings: NavmeshSettings,
@@ -48,19 +49,24 @@ pub struct Navmesh {
 impl Navmesh {
     pub fn new<'a>(
         settings: NavmeshSettings,
-        brushes: impl IntoIterator<Item = (Mat4, &'a Brush)>,
+        brushes: impl IntoIterator<Item = PositionedBrush>,
     ) -> Self {
         let agent_radius = settings.agent_radius;
 
         let brushes = brushes
             .into_iter()
-            .filter_map(|(transform, brush)| {
+            .filter_map(|brush| {
                 // inflate and transform each brush
                 let faces = brush
+                    .brush()
                     .faces()
                     .iter()
                     .map(|face| {
-                        face.map(|p| transform.transform_point3(p + p.signum() * agent_radius))
+                        face.map(|p| {
+                            brush
+                                .transform()
+                                .transform_point3(p + p.signum() * agent_radius)
+                        })
                     })
                     .collect_vec();
 
@@ -73,21 +79,22 @@ impl Navmesh {
             brush
         });
 
+        let mut brush_polygons = Vec::new();
         let mut output_faces = Slab::new();
-        for face in tree
-            .map(|v| v.polygons())
-            .into_iter()
-            .flatten()
-            .filter(|v| v.normal().dot(Vec3::Y) > settings.max_slope_cosine)
-        {
-            output_faces.insert(face);
+        for face in tree.map(|v| v.polygons()).into_iter().flatten() {
+            if face.normal().dot(Vec3::Y) > settings.max_slope_cosine {
+                output_faces.insert(face);
+            } else {
+                brush_polygons.push(face);
+            }
         }
 
         let mut this = Self {
             settings,
-            polygons: output_faces,
+            walkable_polygons: output_faces,
             links: Slab::new(),
             polygon_links: Default::default(),
+            brush_polygons,
         };
 
         this.generate_links();
@@ -95,13 +102,11 @@ impl Navmesh {
     }
 
     pub fn walkable_polygons(&self) -> impl Iterator<Item = (usize, &Face)> {
-        self.polygons
-            .iter()
-            .filter(|(_, v)| v.normal().dot(Vec3::Y) > self.settings.max_slope_cosine)
+        self.walkable_polygons.iter()
     }
 
     pub fn closest_polygon(&self, point: Vec3) -> Option<(usize, Face)> {
-        self.polygons
+        self.walkable_polygons
             .iter()
             .filter(|v| v.1.contains_point(point))
             .map(|v| (v.0, v.1, v.1.distance_to_plane(point)))
@@ -133,7 +138,7 @@ impl Navmesh {
         };
 
         // Assign edge to vertplanes
-        for (id, face) in &self.polygons {
+        for (id, face) in &self.walkable_polygons {
             for (p1, p2) in face.edges() {
                 let edge = PolygonEdge::new(id, p1, p2);
 
@@ -302,7 +307,7 @@ impl Navmesh {
     }
 
     pub fn polygons(&self) -> &Slab<Face> {
-        &self.polygons
+        &self.walkable_polygons
     }
 
     pub fn links(&self) -> &Slab<NavmeshLink> {
@@ -311,6 +316,10 @@ impl Navmesh {
 
     pub fn polygon_links(&self) -> &BTreeMap<usize, Vec<usize>> {
         &self.polygon_links
+    }
+
+    pub fn brush_polygons(&self) -> &[Face] {
+        &self.brush_polygons
     }
 }
 

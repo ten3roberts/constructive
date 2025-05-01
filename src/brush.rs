@@ -1,4 +1,4 @@
-use std::f32::consts::PI;
+use std::{f32::consts::PI, sync::Arc};
 
 use glam::{Mat4, Vec3};
 use itertools::Itertools;
@@ -72,6 +72,28 @@ pub enum FaceIntersect {
     Intersect,
 }
 
+/// A brush positioned in the world
+#[derive(Clone, Debug, Default)]
+pub struct PositionedBrush {
+    transform: Mat4,
+    brush: Arc<Brush>,
+}
+
+impl PositionedBrush {
+    pub fn new(transform: Mat4, brush: Arc<Brush>) -> Self {
+        Self { transform, brush }
+    }
+
+    pub fn brush(&self) -> &Arc<Brush> {
+        &self.brush
+    }
+
+    pub fn transform(&self) -> Mat4 {
+        self.transform
+    }
+}
+
+/// Basic primitive describing a convex shape
 #[derive(Clone, Debug, Default)]
 pub struct Brush {
     faces: Vec<Face>,

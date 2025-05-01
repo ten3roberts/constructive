@@ -1,9 +1,9 @@
 use constructive::{
-    brush::Brush,
+    brush::PositionedBrush,
     link::LinkKind,
     navmesh::{Navmesh, NavmeshSettings},
 };
-use flax::entity::EntityKind;
+use flax::{components::child_of, entity::EntityKind};
 use glam::{Mat4, Vec2};
 use itertools::Itertools;
 use ivy_engine::{
@@ -73,8 +73,7 @@ impl Plugin for NavmeshDebugPlugin {
         assets: &AssetCache,
         schedules: &mut ivy_engine::ivy_core::update_layer::ScheduleSetBuilder,
     ) -> anyhow::Result<()> {
-        let mut navmesh_mesh = None;
-        let mut navmesh_wireframe = None;
+        let mut debug_entity = None;
         let assets = assets.clone();
 
         let generate_navmesh = System::builder()
@@ -86,32 +85,48 @@ impl Plugin for NavmeshDebugPlugin {
                       world: &World,
                       mut query: QueryBorrow<ChangeFilter<Navmesh>>| {
                     for navmesh in &mut query {
-                        if let Some(id) = navmesh_mesh.take() {
+                        if let Some(id) = debug_entity.take() {
                             cmd.despawn(id);
                         }
 
-                        if let Some(id) = navmesh_wireframe.take() {
-                            cmd.despawn(id);
-                        }
+                        let id = world.reserve_one(EntityKind::empty());
+                        debug_entity = Some(id);
+
+                        cmd.append_to(id, Entity::builder().mount(TransformBundle::default()));
+
+                        let flat_material = PbrMaterialData::new()
+                            .with_albedo(TextureData::srgba(Srgba::new(0.5, 0.0, 0.5, 0.1)));
+
+                        cmd.spawn(
+                            Entity::builder()
+                                .mount(TransformBundle::default())
+                                .mount(RenderObjectBundle::new(
+                                    MeshDesc::Content(assets.insert(navmesh_to_mesh(navmesh))),
+                                    &[(
+                                        forward_pass(),
+                                        MaterialData::UnlitMaterial(flat_material.clone()),
+                                    )],
+                                ))
+                                .set_default(child_of(id)),
+                        );
 
                         let flat_material = PbrMaterialData::new()
                             .with_albedo(TextureData::srgba(Srgba::new(0.0, 0.5, 1.0, 0.5)));
 
-                        let id = world.reserve_one(EntityKind::empty());
-                        cmd.append_to(
-                            id,
-                            Entity::builder().mount(TransformBundle::default()).mount(
-                                RenderObjectBundle::new(
-                                    MeshDesc::Content(assets.insert(navmesh_to_mesh(navmesh))),
+                        cmd.spawn(
+                            Entity::builder()
+                                .mount(TransformBundle::default())
+                                .mount(RenderObjectBundle::new(
+                                    MeshDesc::Content(
+                                        assets.insert(walkable_navmesh_to_mesh(navmesh)),
+                                    ),
                                     &[(
                                         forward_pass(),
                                         MaterialData::PbrMaterial(flat_material.clone()),
                                     )],
-                                ),
-                            ),
+                                ))
+                                .set_default(child_of(id)),
                         );
-
-                        navmesh_mesh = Some(id);
 
                         let flat_material = PbrMaterialData::new()
                             .with_albedo(TextureData::srgba(Srgba::new(0.0, 0.5, 1.0, 1.0)));
@@ -121,7 +136,9 @@ impl Plugin for NavmeshDebugPlugin {
                             id,
                             Entity::builder().mount(TransformBundle::default()).mount(
                                 RenderObjectBundle::new(
-                                    MeshDesc::Content(assets.insert(navmesh_to_mesh(navmesh))),
+                                    MeshDesc::Content(
+                                        assets.insert(walkable_navmesh_to_mesh(navmesh)),
+                                    ),
                                     &[(
                                         forward_pass(),
                                         MaterialData::WireframeMaterial(flat_material.clone()),
@@ -129,8 +146,6 @@ impl Plugin for NavmeshDebugPlugin {
                                 ),
                             ),
                         );
-
-                        navmesh_wireframe = Some(id);
                     }
                 },
             );
@@ -145,7 +160,7 @@ impl Plugin for NavmeshDebugPlugin {
 }
 
 #[system(with_query(Query::new(navmesh())))]
-fn navmesh_gizmos(gizmos: &Gizmos, query: &mut QueryBorrow<Component<Navmesh>>) {
+fn navmesh_gizmos_system(gizmos: &Gizmos, query: &mut QueryBorrow<Component<Navmesh>>) {
     let mut gizmos = gizmos.begin_section("navmesh_gizmos");
     for navmesh in query {
         const LINE_THICKNESS: f32 = 0.005;
@@ -174,7 +189,7 @@ fn navmesh_gizmos(gizmos: &Gizmos, query: &mut QueryBorrow<Component<Navmesh>>) 
     }
 }
 
-fn navmesh_to_mesh(navmesh: &Navmesh) -> MeshData {
+fn walkable_navmesh_to_mesh(navmesh: &Navmesh) -> MeshData {
     let polygons = navmesh.walkable_polygons().collect_vec();
     let vertex_count = polygons.len() * 3;
 
@@ -200,6 +215,29 @@ fn navmesh_to_mesh(navmesh: &Navmesh) -> MeshData {
     mesh
 }
 
+fn navmesh_to_mesh(navmesh: &Navmesh) -> MeshData {
+    let polygons = navmesh.brush_polygons();
+    let vertex_count = polygons.len() * 3;
+
+    let mut mesh = MeshData::new()
+        .with_attribute(POSITION_ATTRIBUTE, polygons.iter().flat_map(|v| v.points()))
+        .with_attribute(
+            TEX_COORD_ATTRIBUTE,
+            (0..vertex_count as u32).map(|_| Vec2::ZERO),
+        )
+        .with_attribute(
+            NORMAL_ATTRIBUTE,
+            polygons.iter().flat_map(|v| {
+                let n = v.normal();
+                [n, n, n]
+            }),
+        )
+        .with_indices(0..vertex_count as u32);
+
+    mesh.generate_tangents().unwrap();
+    mesh
+}
+
 fn generate_navmesh_system() -> BoxedSystem {
     System::builder()
         .with_query(Query::new(TransformQuery::new().modified()).with(brushes()))
@@ -208,17 +246,18 @@ fn generate_navmesh_system() -> BoxedSystem {
         .with_cmd_mut()
         .build(
             |mut changed: QueryBorrow<_, _>,
-             mut query: QueryBorrow<(Component<Vec<Brush>>, Component<Mat4>)>,
+             mut query: QueryBorrow<(Component<Vec<PositionedBrush>>, Component<Mat4>)>,
              mut settings: QueryBorrow<Component<NavmeshSettings>>,
              cmd: &mut CommandBuffer| {
                 if changed.iter().next().is_none() {
                     return;
                 }
-                tracing::info!("updating navmesh");
 
-                let brushes = query
-                    .iter()
-                    .flat_map(|(brushes, &transform)| brushes.iter().map(move |v| (transform, v)));
+                let brushes = query.iter().flat_map(|(brushes, &transform)| {
+                    brushes.iter().map(move |v| {
+                        PositionedBrush::new(transform * v.transform(), v.brush().clone())
+                    })
+                });
 
                 let navmesh = Navmesh::new(
                     settings.get(engine()).ok().copied().unwrap_or_default(),

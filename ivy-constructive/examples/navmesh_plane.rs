@@ -124,28 +124,6 @@ impl Plugin for ExamplePlugin {
             ),
         ];
 
-        for (transform, brush) in brushes {
-            let flat_material = PbrMaterialData::new()
-                .with_albedo(TextureData::srgba(Srgba::new(1.0, 1.0, 1.0, 1.0)));
-
-            Entity::builder()
-                .mount(transform)
-                .mount(RenderObjectBundle::new(
-                    MeshDesc::Content(assets.insert(brush_to_mesh(&brush))),
-                    &[(
-                        forward_pass(),
-                        MaterialData::PbrMaterial(flat_material.clone()),
-                    )],
-                ))
-                .set(components::brushes(), vec![brush])
-                .spawn(world);
-        }
-
-        {
-            // let gizmos = world.get(engine(), gizmos())?;
-            // let mut section = gizmos.begin_section("navmesh_links");
-        }
-
         Entity::builder()
             .mount(TransformBundle::default().with_rotation(Quat::from_axis_angle(Vec3::X, -1.0)))
             .mount(LightBundle {
